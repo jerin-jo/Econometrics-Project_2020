@@ -1,0 +1,305 @@
+---
+title: "Guns Project Econometrics"
+author: "Rohit Tolawat, Jerin Jose"
+date: "11/28/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+pacman::p_load(caret, data.table, ggplot2, dplyr, foreign, latticeExtra,gridExtra,reshape)
+knitr::opts_chunk$set(echo = FALSE, fig.width=12, fig.height=6, fig.path = 'Figs/')
+options(digits = 3)
+```
+
+```{r}
+gunsData.df <- read.dta("/Users/jerinjose/Box/Fall 2020/Applied Econometrics and Time Series/ProjectEcon/guns.dta")
+str(gunsData.df)
+dim(gunsData.df)
+```
+
+```{r}
+gunsData.df$stateid <- as.factor(gunsData.df$stateid)
+gunsData.df$year <- as.factor(gunsData.df$year)
+gunsData.df$shall <- as.logical(gunsData.df$shall)
+```
+
+
+```{r}
+gunsData.df$totalCrime <- gunsData.df$rob + gunsData.df$vio + gunsData.df$mur
+
+summary_variables <-  group_by(gunsData.df,year) 
+sumOfCrimePivot <- summarise(summary_variables,sumofCrime = mean(totalCrime), shallIssueStates = sum(shall))
+
+plot1 <- ggplot(sumOfCrimePivot, aes(x=sumOfCrimePivot$year, y=sumOfCrimePivot$sumofCrime))+
+  geom_line()+
+  geom_point(size=2.5)+
+  xlab("Year")+
+  ylab("Avg cases across US per 100,000 people")
+
+plot2 <- ggplot(sumOfCrimePivot, aes(x=sumOfCrimePivot$year))+
+  geom_line(aes(y=sumOfCrimePivot$sumofCrime))+
+  xlab("Year")+
+  ylab("States with shall issue laws")
+
+p1 <- xyplot(sumOfCrimePivot$sumofCrime ~ sumOfCrimePivot$year, sumOfCrimePivot, type = "l" , lwd=2, col= "black", size = 2, ylab = "Avg crime per 100,000 people", xlab = "Year")
+p2 <- xyplot(sumOfCrimePivot$shallIssueStates ~ sumOfCrimePivot$year, sumOfCrimePivot, type = "l" , lwd=2, col="blue", ylab = "# of states with shall-issue law") 
+doubleYScale(p1,p2,add.ylab2 = TRUE, use.style = FALSE)
+
+```
+```{r}
+boxplot(totalCrime~year,data=gunsData.df, main="totalCrime rate across years",
+        xlab="Year", ylab="totalCrime rate",col='gold')
+
+hist(gunsData.df$totalCrime,col='steelblue',xlab='totalCrime rate',ylab='frequency',main=' Histogram of totalCrime rate') 
+```
+
+```{r}
+ggplot(gunsData.df, aes(x=year, y=stateid,fill=shall))+
+  geom_tile(aes(fill=shall,color=shall,width=0.9, height = 0.6))+
+  theme(panel.background = element_blank())+
+  scale_color_manual(values = c("red","blue"))+
+  ggtitle("States that never enforced shall-issue or always had the law will be eliminated from analysis")
+
+```
+```{r}
+summary_stateid <-  group_by(gunsData.df,stateid)
+numOfShallIssuePivot <- summarise(summary_stateid, numOfShallIssues= sum(shall))
+validStateIdTable <- numOfShallIssuePivot[numOfShallIssuePivot$numOfShallIssues > 0 & numOfShallIssuePivot$numOfShallIssues < 23,1]
+stateIdToInclude <-  validStateIdTable$stateid
+
+gunsData.df <- gunsData.df[gunsData.df$stateid %in% stateIdToInclude,]
+dim(gunsData.df)
+str(gunsData.df)
+```
+
+
+```{r}
+ggplot(gunsData.df, aes(x=year, y=stateid))+
+  geom_tile(aes(fill=shall,color=shall,width=0.9, height = 0.8))+
+  theme(panel.background = element_blank())+
+  scale_color_manual(values = c("red","black"))
+```
+
+
+```{r}
+ggplot(gunsData.df, aes(x=year, y=stateid))+
+  geom_tile(aes(fill=totalCrime,width=0.9, height = 0.8))+
+  scale_fill_gradient(low = "white",high = 
+                        "red")+
+  theme(panel.background = element_blank())+
+  scale_colour_manual(values = c("black","purple"))+
+  ggtitle("Crime across years and states")
+```
+
+
+
+```{r}
+summary_variables <-  group_by(gunsData.df,year)
+sumOfCrimePivot <- summarise(summary_variables,sumofCrime = mean(totalCrime), shallIssueStates = sum(shall))
+
+plot1 <- ggplot(sumOfCrimePivot, aes(x=sumOfCrimePivot$year, y=sumOfCrimePivot$sumofCrime))+
+  geom_line()+
+  geom_point(size=2.5)+
+  xlab("Year")+
+  ylab("Avg cases across US per 100,000 people")
+
+plot2 <- ggplot(sumOfCrimePivot, aes(x=sumOfCrimePivot$year))+
+  geom_line(aes(y=sumOfCrimePivot$sumofCrime))+
+  xlab("Year")+
+  ylab("States with shall issue laws")
+
+p1 <- xyplot(sumOfCrimePivot$sumofCrime ~ sumOfCrimePivot$year, sumOfCrimePivot, type = "l" , lwd=2, col= "black", size = 2, ylab = "Avg crime per 100,000 people", xlab = "Year")
+p2 <- xyplot(sumOfCrimePivot$shallIssueStates ~ sumOfCrimePivot$year, sumOfCrimePivot, type = "l" , lwd=2, col="blue", ylab = "# of states with shall-issue law") 
+doubleYScale(p1,p2,add.ylab2 = TRUE, use.style = FALSE) 
+```
+```{r}
+
+state_summary <-  group_by(gunsData.df,stateid)
+stateWiseDataPivot <- summarise(state_summary, avgBlackPop = mean(pb1064), avgWhitePop = mean(pw1064), avgYoungMale = mean(pm1029), avgCrime = mean(totalCrime), avgIncome = mean(avginc), avgDensity = mean(density))
+
+```
+
+
+```{r} 
+scatterPlot1 <-  ggplot(stateWiseDataPivot, aes(x=avgBlackPop, y=avgCrime))+
+  geom_point()+
+  geom_smooth(method="lm",formula = y~x, se=FALSE, linetype = "dashed")+
+  xlab("Avg black population (10-64) across years (in %)")+
+  ylab("Avg crime per 100,000 across years")+
+  ggtitle("States with higher black population witness higher crime rate")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+  
+
+scatterPlot2 <-  ggplot(stateWiseDataPivot, aes(x=avgWhitePop, y=avgCrime))+
+  geom_point()+
+  geom_smooth(method="lm",formula = y~x, se=FALSE,linetype = "dashed")+
+  xlab("Avg white population (10-64) across years (in %)")+
+  ylab("Avg crime per 100,000 across years")+
+  ggtitle("States with higher white population witness lower crime rate ")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+scatterPlot3 <-  ggplot(stateWiseDataPivot, aes(x=avgYoungMale, y=avgCrime))+
+  geom_point()+
+  geom_smooth(method="lm",formula = y~x, se=FALSE, linetype = "dashed")+
+  xlab("Avg young population (10-29) across years (in %)")+
+  ylab("Avg crime per 100,000 across years")+
+  ggtitle("Young male population doesn't seem to have an impact on crime")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+scatterPlot4 <-  ggplot(stateWiseDataPivot, aes(x=avgIncome, y=avgCrime))+
+  geom_point()+
+  geom_smooth(method="lm",formula = y~x, se=FALSE, linetype = "dashed")+
+  xlab("Avg income in '00 USD")+
+  ylab("Avg crime per 100,000 across years")+
+  ggtitle("States with higher income have high crime rates")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+scatterPlot5 <-  ggplot(stateWiseDataPivot, aes(x=avgDensity, y=avgCrime))+
+  geom_point()+
+  geom_smooth(method="lm",formula = y~x, se=FALSE, linetype = "dashed")+
+  xlab("Avg density")+
+  ylab("Avg crime per 100,000 across years")+
+  ggtitle("Crime tends to increase mildly with increase in population density")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+
+grid.arrange(scatterPlot1,scatterPlot2,ncol=2)
+grid.arrange(scatterPlot3,scatterPlot4,ncol=2)
+grid.arrange(scatterPlot5,ncol=1)
+
+```
+
+```{r}
+summary_year_shall <-  group_by(gunsData.df,year,shall)
+crimeByYearByShallPivot <-  summarise(summary_year_shall,avgCrime = mean(totalCrime), sumShall = sum(shall))
+```
+
+
+```{r}
+ggplot(crimeByYearByShallPivot, aes(x=year, y=avgCrime, group=shall, color=shall)) +
+    geom_line()+
+    geom_point(aes(size=0.5))+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+  ggtitle("States without shall-issue seem to have higher crime rates than those that don't, is this the case?")
+```
+```{r}
+shallPivot_variables <- group_by(gunsData.df,stateid,shall)
+shallPivot <- summarise(shallPivot_variables,avgCrime = mean(totalCrime))
+shallPivotCast <- cast(shallPivot,stateid~shall,fun.aggregate = mean)
+names(shallPivotCast) <- c("StateID","Without","With")
+shallPivotCast$perChange <- ((shallPivotCast$With - shallPivotCast$Without)/shallPivotCast$Without)*100
+
+for (i in 1:nrow(shallPivotCast)){
+ if(shallPivotCast$perChange[i]>0)
+  shallPivotCast$type[i] <-  "Positive"
+  else
+   shallPivotCast$type[i] <- "negative"
+}
+
+
+ggplot(shallPivotCast, aes(x=shallPivotCast$StateID,y=perChange,fill=shallPivotCast$type, color=shallPivotCast$type))+
+  geom_bar(stat = "identity")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+```
+```{r}
+ggplot(shallPivotCast,aes(x=shallPivotCast$perChange))+
+  geom_histogram(binwidth=10,color="black",fill="#FFE4C4")+
+  geom_vline(xintercept = 0, linetype="dashed",color="red")
+```
+```{r}
+
+
+```
+
+
+
+
+```{r}
+
+library(plm)
+#converting to panel data
+guns_panel  <- pdata.frame(gunsData.df,index=c("stateid","year")) 
+str(guns_panel)
+
+
+```
+
+```{r}
+#Pooled Ordinary Least Squares ; Model 1 
+
+pooledOLS <- plm(log(totalCrime)~ shall + log(incarc_rate)+ pb1064 + pw1064 + pm1029 + pop + avginc + log(density), model="pooling",data=guns_panel) 
+summary(pooledOLS) 
+
+```
+```{r}
+
+#drawing a 95% confidence intervel around the mean crime across states
+library(gplots)
+plotmeans(totalCrime ~ stateid , main="Heterogeineity across States", data=guns_panel)
+```
+```{r}
+#drawing a 95% confidence intervel around the mean crime across years
+library(gplots)
+plotmeans(log(totalCrime)~ year , main="Heterogeineity across Years", data=guns_panel)
+```
+
+
+```{r}
+#Check for Heteroskedasticity using residual plot
+
+guns_panel$prdval <- predict(pooledOLS)
+ggplot(guns_panel, aes(x = prdval, y = log(totalCrime)-prdval))+ 
+geom_point(aes(size=0.5)) + geom_hline(yintercept = 0, linetype = "dashed", color = "red")
+```
+
+
+```{r}
+# Regular/Pooled OLS regression does not consider heterogeneity across groups or time.So we need to use Fixed effects models to estimate the effect as we can see heterogeneity across groups and time in our dataset. Individual intercepts ‘control’’ for individual heterogeneity – both observed and unobserved in Fixed Effects model 
+```
+
+
+```{r}
+# Least squares dummy variable model
+dummyls <- lm(log(totalCrime)~ shall + log(incarc_rate)+ pb1064 + pw1064 + pm1029 + pop + avginc + log(density)+ stateid + year, data=guns_panel)  
+summary(dummyls)  
+
+```
+
+```{r}
+
+#Fixed Effects within Entity(state) Model 
+entityFE <- plm(log(totalCrime)~ shall + log(incarc_rate)+ pb1064 + pw1064 + pm1029 + pop + avginc + log(density), model="within",data=guns_panel) 
+summary(entityFE) 
+
+?plm
+```
+```{r}
+#Time & Entity(state) Fixed Effects  Model
+time_entityFE <- plm(log(totalCrime)~ shall + log(incarc_rate)+ pb1064 + pw1064 + pm1029 + pop + avginc + log(density)+ year, model="within",data=guns_panel)
+summary(time_entityFE) 
+
+```
+```{r}
+# ENTITY-FIXED VS TIME & ENTITY FIXED
+null2<-c("year78=0","year79=0","year80=0","year81=0","year82=0","year83=0","year84=0","year85=0","year86=0","year87=0","year88=0","year89=0","year90=0","year91=0","year92=0","year93=0","year94=0","year95=0","year96=0","year97=0","year98=0","year99=0")
+library(lmtest)
+library(car)
+linearHypothesis(time_entityFE,null2)
+library(knitr)
+kable(linearHypothesis(time_entityFE ,null2)) 
+pFtest(time_entityFE,entityFE) 
+
+```
+
+```{r}
+
+#time and entity FE model is better than just entity FE model according to our test.
+```
+
